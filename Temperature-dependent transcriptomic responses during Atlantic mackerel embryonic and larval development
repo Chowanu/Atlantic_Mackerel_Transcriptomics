@@ -1,0 +1,495 @@
+# ============================================================
+# Transcriptomic analysis script for Atlantic mackerel RNA-seq
+# Figures: PCA, DEG summary, volcano plots, Cook's distance,
+# PANTHER input files, REVIGO input files and treemaps
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. Load libraries
+# ------------------------------------------------------------
+
+library(DESeq2)
+library(ggplot2)
+library(treemap)
+
+# ------------------------------------------------------------
+# 2. Set working directory
+# ------------------------------------------------------------
+
+setwd("FILE_DIRECTORY/gene counts")
+
+# ------------------------------------------------------------
+# 3. Load count files and define final sample set
+# ------------------------------------------------------------
+
+allFiles <- list.files(pattern = "_counts.txt")
+
+sampleFiles <- unique(sampleFiles)
+
+# ------------------------------------------------------------
+# 4. Create sample table
+# ------------------------------------------------------------
+
+condition <- sub(
+  "^([A-Z]+)([0-9]+).*",
+  "\\1_\\2",
+  sampleFiles
+)
+
+sampleTable <- data.frame(
+  sampleName = sampleFiles,
+  fileName = sampleFiles,
+  condition = factor(condition)
+)
+
+sampleTable$stage <- factor(sampleTable$stage, levels = c("I", "II", "L"))
+sampleTable$temp <- factor(sampleTable$temp, levels = c("11", "12", "13", "14", "16"))
+
+sampleTable$stage_label <- as.character(sampleTable$stage)
+
+sampleTable$condition_final <- paste0(
+  sampleTable$stage_label,
+  "_",
+  sampleTable$temp
+)
+
+print(sampleTable)
+print(table(sampleTable$stage, sampleTable$temp))
+
+write.table(
+  sampleTable,
+  file = "sampleTable_final.txt",
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+# ------------------------------------------------------------
+# 5. Run DESeq2
+# ------------------------------------------------------------
+
+dds <- DESeqDataSetFromHTSeqCount(
+  sampleTable = sampleTable,
+  directory = ".",
+  design = ~ condition
+)
+
+dds <- DESeq(dds)
+
+vsd <- vst(dds, blind = TRUE)
+
+# ------------------------------------------------------------
+# 6. PCA plot
+# ------------------------------------------------------------
+
+pcaData <- plotPCA(
+  vsd,
+  intgroup = c("stage", "temp"),
+  returnData = TRUE
+)
+
+pcaData$sample <- rownames(pcaData)
+
+pcaData$condition_final <- sampleTable$condition_final[
+  match(pcaData$sample, sampleTable$sampleName)
+]
+
+pcaData$stage_label <- sampleTable$stage_label[
+  match(pcaData$sample, sampleTable$sampleName)
+]
+
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+p_pca <- ggplot(
+  pcaData,
+  aes(
+    x = PC1,
+    y = PC2,
+    colour = condition_final
+  )
+) +
+  geom_point(size = 4) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  ggtitle("PCA of samples by stage and temperature") +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.title = element_blank()
+  )
+
+print(p_pca)
+
+ggsave(
+  "PCA_stage_temperature_final.png",
+  plot = p_pca,
+  width = 9,
+  height = 7,
+  dpi = 300
+)
+
+# ------------------------------------------------------------
+# 7. Cook's distance diagnostics
+# ------------------------------------------------------------
+
+cooks <- assays(dds)[["cooks"]]
+
+maxCooks <- apply(
+  cooks,
+  2,
+  max,
+  na.rm = TRUE
+)
+
+cook_table <- data.frame(
+  sample = names(maxCooks),
+  max_cooks_distance = maxCooks
+)
+
+cook_table <- cook_table[
+  order(cook_table$max_cooks_distance, decreasing = TRUE),
+]
+
+print(cook_table)
+
+write.table(
+  cook_table,
+  file = "cooks_distance_final.txt",
+  sep = "\t",
+  quote = FALSE,
+  row.names = FALSE
+)
+
+# ------------------------------------------------------------
+# 8. Extract DESeq2 comparisons
+# True 12 degrees corresponds to file-code 10
+# ------------------------------------------------------------
+
+# Stage I
+res_IA11 <- results(dds, contrast = c("condition", "I_11",  "IA_12"))
+res_IA13 <- results(dds, contrast = c("condition", "I_13", "IA_12"))
+res_IA14 <- results(dds, contrast = c("condition", "I_14", "IA_12"))
+res_IA16 <- results(dds, contrast = c("condition", "I_16", "IA_12"))
+
+# Stage II
+res_II11 <- results(dds, contrast = c("condition", "II_11",  "II_12"))
+res_II13 <- results(dds, contrast = c("condition", "II_13", "II_12"))
+res_II14 <- results(dds, contrast = c("condition", "II_14", "II_12"))
+res_II16 <- results(dds, contrast = c("condition", "II_16", "II_12"))
+
+# Larvae
+res_L11 <- results(dds, contrast = c("condition", "L_11",  "L_12"))
+res_L13 <- results(dds, contrast = c("condition", "L_13", "L_12"))
+res_L14 <- results(dds, contrast = c("condition", "L_14", "L_12"))
+res_L16 <- results(dds, contrast = c("condition", "L_16", "L_12"))
+
+# ------------------------------------------------------------
+# 9. Save full DESeq2 result tables
+# ------------------------------------------------------------
+
+write.table(as.data.frame(res_IA11), "DESeq2_I11_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_IA13), "DESeq2_I13_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_IA14), "DESeq2_I14_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_IA16), "DESeq2_I16_vs_12.txt", sep = "\t", quote = FALSE)
+
+write.table(as.data.frame(res_II11), "DESeq2_II11_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_II13), "DESeq2_II13_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_II14), "DESeq2_II14_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_II16), "DESeq2_II16_vs_12.txt", sep = "\t", quote = FALSE)
+
+write.table(as.data.frame(res_L11), "DESeq2_L11_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_L13), "DESeq2_L13_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_L14), "DESeq2_L14_vs_12.txt", sep = "\t", quote = FALSE)
+write.table(as.data.frame(res_L16), "DESeq2_L16_vs_12.txt", sep = "\t", quote = FALSE)
+
+# ------------------------------------------------------------
+# 10. DEG summary table
+# ------------------------------------------------------------
+
+count_DEGs <- function(res,
+                       comparison_name,
+                       padj_cutoff = 0.05,
+                       log2fc_cutoff = 1) {
+  
+  res_df <- as.data.frame(res)
+  res_df <- res_df[!is.na(res_df$padj), ]
+  
+  sig <- res_df[
+    res_df$padj < padj_cutoff &
+      abs(res_df$log2FoldChange) >= log2fc_cutoff,
+  ]
+  
+  up <- sum(sig$log2FoldChange >= log2fc_cutoff)
+  down <- sum(sig$log2FoldChange <= -log2fc_cutoff)
+  
+  data.frame(
+    Comparison = comparison_name,
+    Upregulated = up,
+    Downregulated = down,
+    Total_DEGs = up + down
+  )
+}
+
+DEG_table <- rbind(
+  count_DEGs(res_IA11, "I 11°C vs I 12°C"),
+  count_DEGs(res_IA13, "I 13°C vs I 12°C"),
+  count_DEGs(res_IA14, "I 14°C vs I 12°C"),
+  count_DEGs(res_IA16, "I 16°C vs I 12°C"),
+  
+  count_DEGs(res_II11, "II 11°C vs II 12°C"),
+  count_DEGs(res_II13, "II 13°C vs II 12°C"),
+  count_DEGs(res_II14, "II 14°C vs II 12°C"),
+  count_DEGs(res_II16, "II 16°C vs II 12°C"),
+  
+  count_DEGs(res_L11, "L 11°C vs L 12°C"),
+  count_DEGs(res_L13, "L 13°C vs L 12°C"),
+  count_DEGs(res_L14, "L 14°C vs L 12°C"),
+  count_DEGs(res_L16, "L 16°C vs L 12°C")
+)
+
+print(DEG_table)
+
+write.csv(
+  DEG_table,
+  file = "DEG_summary_table_final.csv",
+  row.names = FALSE
+)
+
+# DEG count bar plot
+
+p_deg <- ggplot(
+  DEG_table,
+  aes(x = Comparison, y = Total_DEGs)
+) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  ylab("Number of DEGs") +
+  xlab("Comparison") +
+  ggtitle("Differentially expressed genes across temperature comparisons") +
+  theme_bw()
+
+print(p_deg)
+
+ggsave(
+  "DEG_summary_barplot.png",
+  plot = p_deg,
+  width = 9,
+  height = 7,
+  dpi = 300
+)
+
+# ------------------------------------------------------------
+# 11. Volcano plots
+# ------------------------------------------------------------
+
+makeVolcano <- function(res, title) {
+  
+  res_df <- as.data.frame(res)
+  res_df <- res_df[!is.na(res_df$padj), ]
+  
+  res_df$color <- "grey"
+  
+  res_df$color[
+    res_df$padj < 0.05 &
+      res_df$log2FoldChange < -1
+  ] <- "blue"
+  
+  res_df$color[
+    res_df$padj < 0.05 &
+      res_df$log2FoldChange > 1
+  ] <- "red"
+  
+  plot(
+    res_df$log2FoldChange,
+    -log10(res_df$padj),
+    pch = 20,
+    col = res_df$color,
+    xlab = "log2 Fold Change",
+    ylab = "-log10 adjusted p-value",
+    main = title
+  )
+  
+  abline(v = c(-1, 1), lty = 2)
+  abline(h = -log10(0.05), lty = 2)
+}
+
+png(
+  filename = "Volcano_plots_final.png",
+  width = 3000,
+  height = 2200,
+  res = 250
+)
+
+par(
+  mfrow = c(3, 4),
+  mar = c(4, 4, 3, 1)
+)
+
+makeVolcano(res_IA11, "I 11°C vs 12°C")
+makeVolcano(res_IA13, "I 13°C vs 12°C")
+makeVolcano(res_IA14, "I 14°C vs 12°C")
+makeVolcano(res_IA16, "I 16°C vs 12°C")
+
+makeVolcano(res_II11, "II 11°C vs 12°C")
+makeVolcano(res_II13, "II 13°C vs 12°C")
+makeVolcano(res_II14, "II 14°C vs 12°C")
+makeVolcano(res_II16, "II 16°C vs 12°C")
+
+makeVolcano(res_L11, "L 11°C vs 12°C")
+makeVolcano(res_L13, "L 13°C vs 12°C")
+makeVolcano(res_L14, "L 14°C vs 12°C")
+makeVolcano(res_L16, "L 16°C vs 12°C")
+
+dev.off()
+
+# ------------------------------------------------------------
+# 12. Create PANTHER gene lists
+# ------------------------------------------------------------
+
+make_panther_gene_list <- function(res,
+                                   output_file,
+                                   padj_cutoff = 0.05,
+                                   log2fc_cutoff = 1) {
+  
+  res_df <- as.data.frame(res)
+  res_df$gene_id <- rownames(res_df)
+  
+  sig <- res_df[
+    !is.na(res_df$padj) &
+      res_df$padj < padj_cutoff &
+      abs(res_df$log2FoldChange) >= log2fc_cutoff,
+  ]
+  
+  write.table(
+    sig$gene_id,
+    file = output_file,
+    quote = FALSE,
+    row.names = FALSE,
+    col.names = FALSE
+  )
+  
+  cat(output_file, "saved with", nrow(sig), "genes\n")
+}
+
+make_panther_gene_list(res_IA11, "PANTHER_genes_I11_vs_12.txt")
+make_panther_gene_list(res_IA13, "PANTHER_genes_I13_vs_12.txt")
+make_panther_gene_list(res_IA14, "PANTHER_genes_I14_vs_12.txt")
+make_panther_gene_list(res_IA16, "PANTHER_genes_I16_vs_12.txt")
+
+make_panther_gene_list(res_II11, "PANTHER_genes_II11_vs_12.txt")
+make_panther_gene_list(res_II13, "PANTHER_genes_II13_vs_12.txt")
+make_panther_gene_list(res_II14, "PANTHER_genes_II14_vs_12.txt")
+make_panther_gene_list(res_II16, "PANTHER_genes_II16_vs_12.txt")
+
+make_panther_gene_list(res_L11, "PANTHER_genes_L11_vs_12.txt")
+make_panther_gene_list(res_L13, "PANTHER_genes_L13_vs_12.txt")
+make_panther_gene_list(res_L14, "PANTHER_genes_L14_vs_12.txt")
+make_panther_gene_list(res_L16, "PANTHER_genes_L16_vs_12.txt")
+
+# ------------------------------------------------------------
+# 13. Extract GO IDs from PANTHER output for REVIGO
+# ------------------------------------------------------------
+# Run this after downloading PANTHER GO Biological Process results.
+# PANTHER files should be saved as .txt files in the working directory.
+
+make_revigo_go_only <- function(file_in, file_out) {
+  
+  panther <- read.table(
+    file_in,
+    sep = "\t",
+    header = TRUE,
+    skip = 11,
+    fill = TRUE,
+    quote = "",
+    comment.char = ""
+  )
+  
+  GO_ID <- gsub(
+    ".*\\((GO:\\d+)\\).*",
+    "\\1",
+    panther[, 1]
+  )
+  
+  FDR <- as.numeric(panther[, 8])
+  
+  GO_ID <- GO_ID[
+    grepl("^GO:\\d+$", GO_ID) &
+      !is.na(FDR) &
+      FDR < 0.05
+  ]
+  
+  write.table(
+    GO_ID,
+    file = file_out,
+    quote = FALSE,
+    row.names = FALSE,
+    col.names = FALSE
+  )
+  
+  cat(file_out, "saved with", length(GO_ID), "GO terms\n")
+}
+
+# Example file names.
+# Edit input filenames if PANTHER outputs are named differently.
+
+make_revigo_go_only("I11_vs_I12.txt", "REVIGO_I11_vs_12.txt")
+make_revigo_go_only("I13_vs_I12.txt", "REVIGO_I13_vs_12.txt")
+make_revigo_go_only("I14_vs_I12.txt", "REVIGO_I14_vs_12.txt")
+make_revigo_go_only("I16_vs_I12.txt", "REVIGO_I16_vs_12.txt")
+
+make_revigo_go_only("II13_vs_12.txt", "REVIGO_II13_vs_12.txt")
+make_revigo_go_only("II14_vs_12.txt", "REVIGO_II14_vs_12.txt")
+make_revigo_go_only("II16_vs_12.txt", "REVIGO_II16_vs_12.txt")
+
+make_revigo_go_only("L13_vs_12.txt", "REVIGO_L13_vs_12.txt")
+make_revigo_go_only("L14_vs_12.txt", "REVIGO_L14_vs_12.txt")
+make_revigo_go_only("L16_vs_12.txt", "REVIGO_L16_vs_12.txt")
+
+# ------------------------------------------------------------
+# 14. REVIGO treemap template
+# ------------------------------------------------------------
+# REVIGO generates an R script containing revigo.data.
+# Paste one REVIGO output script below this section,
+# then run the treemap code.
+# Repeat this section for each comparison.
+
+# The REVIGO script should create:
+# revigo.names
+# revigo.data
+
+# After pasting REVIGO data, run:
+
+stuff <- data.frame(revigo.data)
+names(stuff) <- revigo.names
+
+stuff$frequency <- as.numeric(as.character(stuff$frequency))
+stuff$uniqueness <- as.numeric(as.character(stuff$uniqueness))
+stuff$dispensability <- as.numeric(as.character(stuff$dispensability))
+
+stuff <- subset(stuff, dispensability < 0.15)
+
+pdf(
+  file = "REVIGO_treemap_example.pdf",
+  width = 16,
+  height = 9
+)
+
+treemap(
+  stuff,
+  index = c("representative", "description"),
+  vSize = "frequency",
+  type = "value",
+  vColor = "frequency",
+  palette = "Blues",
+  title = "GO Biological Process Enrichment",
+  title.legend = "Frequency",
+  fontsize.labels = c(14, 10),
+  inflate.labels = TRUE,
+  position.legend = "right"
+)
+
+dev.off()
+
+# ------------------------------------------------------------
+# End of script
+# ------------------------------------------------------------
