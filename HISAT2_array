@@ -1,0 +1,49 @@
+#!/bin/sh
+#PBS -W group_list=pr_47002 -A pr_47002
+#PBS -N hisat2
+#PBS -o hisat2.log
+#PBS -e hisat2.err
+#PBS -m n
+
+#PBS -l nodes=1:ppn=4
+#PBS -l mem=16gb
+#PBS -l walltime=08:00:00
+#PBS -t 1-103%20   # replace XXX with number of lines
+
+cd $PBS_O_WORKDIR
+
+module purge
+module load tools
+module load hisat2/2.2.1
+module load samtools/1.20
+
+# -------------------------
+# Get forward read
+# -------------------------
+FWD=$(sed -n "${PBS_ARRAYID}p" trimmed_reads.txt)
+
+# Derive reverse
+REV=${FWD/_forward_paired.fq/_reverse_paired.fq}
+
+# -------------------------
+# Extract prefix BEFORE MKRN
+# -------------------------
+BASENAME=$(basename "$FWD")
+PREFIX=$(echo "$BASENAME" | sed 's/MKRN.*//')
+
+# -------------------------
+# Output directory
+# -------------------------
+OUTDIR=/home/projects/pr_47002/data/DANIELA/mackerel/hisat2_out/${PREFIX}
+mkdir -p "$OUTDIR"
+
+echo "Processing $PREFIX"
+
+# -------------------------
+# Run HISAT2 + BAM conversion + sorting
+# -------------------------
+hisat2 -p 4 \
+-x /home/projects/pr_47002/data/DANIELA/mackerel/index/hisat2_index \
+-1 "$FWD" \
+-2 "$REV" | \
+samtools sort -@ 4 -o "$OUTDIR/${PREFIX}_sorted.bam"
