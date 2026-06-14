@@ -1,0 +1,38 @@
+#!/bin/bash
+#PBS -W group_list=pr_47002 -A pr_47002
+#PBS -N fastqc
+#PBS -e fastqc.err
+#PBS -o fastqc.log
+#PBS -m n
+#PBS -l nodes=1:ppn=8
+#PBS -l mem=16gb
+#PBS -l walltime=03:00:00
+
+set -euo pipefail
+
+echo "Working directory: $PBS_O_WORKDIR"
+cd "$PBS_O_WORKDIR"
+
+module purge
+module load tools
+module load java/1.8.0
+module load fastqc/0.11.9
+module load multiqc
+
+INDIR="/home/projects/pr_47002/data/DANIELA/mackerel/merged"
+OUTDIR="/home/projects/pr_47002/data/DANIELA/mackerel/fastqc_merged"
+
+mkdir -p "$OUTDIR"
+
+echo "Running FastQC..."
+
+fastqc -t 8 -o "$OUTDIR" "$INDIR"/*.fq
+
+echo "Running MultiQC..."
+
+cd "$OUTDIR"
+multiqc .
+
+echo "Done!"
+
+
