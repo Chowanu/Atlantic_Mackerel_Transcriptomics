@@ -1,0 +1,70 @@
+#!/bin/sh
+#PBS -W group_list=pr_47002 -A pr_47002
+#PBS -N htseq
+#PBS -e htseq.err
+#PBS -o htseq.log
+#PBS -m n
+
+# htseq-count is single-threaded
+#PBS -l nodes=1:ppn=1:thinnode
+#PBS -l mem=8gb
+#PBS -l walltime=08:00:00
+#PBS -t 1-51%20
+
+echo "Working directory: $PBS_O_WORKDIR"
+cd $PBS_O_WORKDIR
+
+# -------------------------
+# Load environment
+# -------------------------
+module purge
+module load tools
+module load samtools/1.20
+module load anaconda/4.4.0
+
+# -------------------------
+# Annotation (Scomber scombrus)
+# -------------------------
+ANNOT=/home/projects/pr_47002/data/DANIELA/mackerel/index/annot_mackerel.gff
+
+# -------------------------
+# Output directory
+# -------------------------
+OUTDIR=/home/projects/pr_47002/data/DANIELA/mackerel/counts
+mkdir -p "$OUTDIR"
+
+# -------------------------
+# Select BAM for this task
+# -------------------------
+BAM=$(sed -n "${PBS_ARRAYID}p" bamlist.txt)
+SAMPLE=$(basename "$BAM" _sorted.bam)
+OUTFILE="${OUTDIR}/${SAMPLE}_counts.txt"
+
+# -------------------------
+# Skip if already done
+# -------------------------
+if [ -s "$OUTFILE" ]; then
+    echo "Skipping $SAMPLE (already counted)"
+    exit 0
+fi
+
+echo "[$(date)] Counting $SAMPLE"
+echo "BAM: $BAM"
+
+# -------------------------
+# Run htseq-count
+# -------------------------
+htseq-count \
+  -f bam \
+  -t exon \
+  -i gene \
+  -m intersection-strict \
+  --stranded=no \
+  "$BAM" \
+  "$ANNOT" \
+  > "$OUTFILE"
+
+echo "[$(date)] Finished $SAMPLE"
+``
+
+

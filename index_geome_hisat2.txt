@@ -1,0 +1,14 @@
+hisat2-build \
+/home/projects/pr_47002/data/DANIELA/mackerel/index/GCF_963691925.1_fScoSco1.1_genomic.fna \
+ /home/projects/pr_47002/data/DANIELA/mackerel/index/hisat2_index
+
+find /home/projects/pr_47002/data/DANIELA/mackerel/merged \
+-name "*R1_merged.fq" | sort > merged_reads.txt
+
+
+
+
+
+before gene counts:
+find /home/projects/pr_47002/data/DANIELA/mackerel/hisat2_out/*/*.bam \
+-name "*_sorted.bam" | sort > bamlist.txt
