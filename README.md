@@ -1,18 +1,25 @@
 # Atlantic_Mackerel_Transcriptomics
-RNA-seq analysis pipeline and supporting scripts used in the Bachelor Thesis: Temperature-dependent transcriptomic responses during Atlantic mackerel development.
+RNA-seq analysis pipeline and bioinformatic workflow used in the bachelor thesis "Temperature-dependent transcriptomic responses during Atlantic mackerel embryonic and larval development", including FastQC quality control, Trimmomatic preprocessing, HISAT2 alignment, HTSeq read counting, and downstream transcriptomic analyses.
 
-This repository contains the R scripts used in the Bachelor Thesis:
+# Atlantic Mackerel Transcriptomics
 
-"Temperature-dependent transcriptomic responses during Atlantic mackerel embryonic and larval development"
+This repository contains the bioinformatic workflow used in the bachelor thesis:
 
-## Contents
+**"Temperature-dependent transcriptomic responses during Atlantic mackerel embryonic and larval development"**
 
-- DESeq2 differential expression analysis
-- PCA visualization
-- Volcano plots
-- Cook's distance diagnostics
-- Gene Ontology enrichment preparation
-- REVIGO treemap generation
+The repository includes scripts for:
+
+* FastQC quality assessment
+* Read trimming and preprocessing (Trimmomatic)
+* Lane merging
+* HISAT2 genome indexing and alignment
+* HTSeq read counting
+* Differential gene expression analysis
+* Data visualization and downstream transcriptomic analyses
+
+Author: Daniil Atamaniuk
+Technical University of Denmark (DTU)
+National Institute of Aquatic Resources (DTU Aqua)
 
 ## Software
 
@@ -20,8 +27,3 @@ This repository contains the R scripts used in the Bachelor Thesis:
 - DESeq2
 - ggplot2
 - treemap
-
-## Author
-
-Daniil Atamaniuk
-Technical University of Denmark (DTU)
